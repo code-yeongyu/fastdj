@@ -4,7 +4,8 @@ user_model = {
     "custom_user": True,  # set to make custom user model
     "token_auth": True,  # set to use token auth to authenticate
     "allow_register": True,  # set to use auto-craeted register function
-    "models": {
+    "models":
+    {  # check available fields at https://docs.djangoproject.com/en/2.2/ref/models/fields/
         "nickname": {
             "field": "CharField",
             "options": ["max_length=10"]
@@ -55,7 +56,7 @@ app = {
                 "template": "detail_view",
                 "permissions": "AllowAny" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
             },
-            "all_posts_view": { # make a route for read all datas of its model in the DB, create a data of its model in the DB
+            "all_posts_view": { # make a route for read all posts of its model in the DB, create a data of its model in the DB
                 "template": "all_objects_view",
                 "permissions": "AllowAnyOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
             },
