@@ -28,7 +28,7 @@ user_model = {
     }
 }
 
-app = {
+apps = {
     "article": { # app name here
         "models": { # check available fields at https://docs.djangoproject.com/en/2.2/ref/models/fields/
             "writer": {
@@ -89,3 +89,6 @@ app = {
         }
     }
 }
+
+timezone = "Asia/Seoul"
+language = 'ko-kr'
