@@ -69,12 +69,13 @@ class ProjectConfigurations:
                                           last_module_index:]
 
     def add_installed_modules(self):  # djangorestframework django-cors-headers
-        modules = ['rest_framework', 'rest_framework.authtoken', 'corsheaders']
+        modules = ['rest_framework', 'corsheaders']
         for module in modules:
             self.add_module(module)
 
     def add_token_login_model(self):  # token login model
         self.settings += "\n# added by fastdj\nREST_FRAMEWORK = {\n\t'DEFAULT_AUTHENTICATION_CLASSES': (\n\t\t'rest_framework.authentication.BasicAuthentication',\n\t\t'rest_framework.authentication.TokenAuthentication',\n\t),\n}\n"
+        self.add_module('rest_framework.authtoken')
 
     def set_cross_origin_all(self):  # cors origin allow all
         self.settings += "\n# added by fastdj\nCORS_ORIGIN_ALLOW_ALL = True\nCORS_ALLOW_CREDENTIALS = True\n"
@@ -139,7 +140,14 @@ class Project:
         self.confs = ProjectConfigurations(self.project_name)
         try:
             self.timezone = setup_file.timezone
+        except:
+            pass
+        try:
             self.language = setup_file.language
+        except:
+            pass
+        try:
+            self.use_token_auth = setup_file.user_model.use_token_auth
         except:
             pass
 
@@ -170,7 +178,9 @@ class Project:
         self.confs.load_settings()
         self.confs.load_urls()
         self.confs.add_installed_modules()
-        self.confs.add_token_login_model()
+        if "use_token_auth" in dir(self):
+            if self.use_token_auth == True:
+                self.confs.add_token_login_model()
         self.confs.set_cross_origin_all()
         self.confs.set_allowed_hosts_all()
         if "timezone" in dir(self):
