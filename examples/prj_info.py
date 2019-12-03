@@ -36,11 +36,12 @@ apps = {
                     "template": "model_owner"
                     """
                     replacable with:
-                        field: "ForeignKey",
-                        options: ["'auth.user'", "related_name='article_writer'", "on_delete=models.CASCADE", "null=False"],
-                        serializers: { # check available fields at https://www.django-rest-framework.org/api-guide/fields/
-                        field: "ReadOnlyField",
-                        options: ["source='writer.username"]
+                        "field": "ForeignKey",
+                        "options": ["'auth.user'", "related_name='article_writer'", "on_delete=models.CASCADE", "null=False"],
+                        "serializers": { # check available fields at https://www.django-rest-framework.org/api-guide/fields/
+                            "options": ["source='writer.username"]
+                            "field": "ReadOnlyField",
+                        }
                     """
                 },
                 "content": {
@@ -54,11 +55,11 @@ apps = {
             },
         },
         "views": {
-            "post_detail_view": { # make a route for reading, updating, deleting a post
+            "PostDetail": { # make a route for reading, updating, deleting a post
                 "template": "detail_view",
                 "permissions": "AllowAny" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
             },
-            "all_posts_view": { # make a route for read all posts of its model in the DB, create a data of its model in the DB
+            "PostOverall": { # make a route for read all posts of its model in the DB, create a data of its model in the DB
                 "template": "all_objects_view",
                 "permissions": "AllowAnyOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
             },
