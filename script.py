@@ -6,6 +6,13 @@ except:
     exit()
 
 
+class Template:
+    model_owner = "model_owner"
+    detail_view = "detail_view"
+    all_objects_view = "all_objects_view"
+    filter_objects_view = "filter_objects_view"
+
+
 class ProjectCommand:  # class about project initializing, like commands
     def __init__(self, prj_name):
         self.prj_name = prj_name
@@ -138,30 +145,58 @@ class Model:
     def add_field(self, field):
         self.fields.append(field)
 
-    def get_code(self):
+    def get_serializers_code(self):
+        code = ""
+        for field in self.fields:
+            options_str = ""
+            for option in field.serializers.get("options", list()):
+                options_str += option + ", "
+            options_str = options_str[:-2]  # to remove last ", "
+            field_object = field.serializers.get('field')
+            if field_object == None:
+                break
+            code += f"\t{field.name} = serializers.{field_object}({options_str})\n"
+        code += "\tclass Meta:\n"
+        code += f"\t\tmodel = {self.name}\n"
+        fields_str = ""
+        for field in self.fields:
+            fields_str += field.name + ", "
+        fields_str = fields_str[:-2]  # to remove last ", "
+        code += f"\t\tfields = ({fields_str})"
+        return code
+
+    def get_models_code(self):
         code = f"class {self.name}(models.Model):\n"
         for field in self.fields:
             code += field.get_code()
         return code
 
 
-class View:
+class ViewSet:
     def __init__(self,
                  name,
-                 template=None,
-                 options=None,
-                 permissions=None,
+                 template,
+                 options=list(),
+                 permissions="",
                  url_getters=None):
         self.name = name
         self.template = template
         self.options = options
         self.permissions = permissions
         self.url_getters = url_getters
+        self.modules = list()
+
+    def get_code():
+        code = ""
+        if template == Template.detail_view:
+            code = f"class {self.name}(generics.RetreiveUpdateAPIView):\n"
+            code += "\t"
 
 
 class App:
-    def __init__(self, name):
+    def __init__(self, name, project_name):
         self.name = name
+        self.project_name = project_name
         self.models = list()
         self.views = list()
         self.models_code = ""
@@ -173,11 +208,33 @@ class App:
     def add_view(self, view):
         self.views.append(views)
 
-    def save_models(self, project_name):
-        file = open(f"{os.getcwd()}/{project_name}/{self.name}/models.py", 'a')
+    def get_models_code(self):
+        code = ""
         for model in self.models:
-            file.write(model.get_code())
-            file.write("\n")
+            code += model.get_models_code() + "\n"
+        return code
+
+    def get_serializers_code(self):
+        code = "from rest_framework import serializers\n"
+        code += f"from {self.name}.models import {self.name}\n"
+
+        for model in self.models:
+            code += f"class {model.name}Serializer(serializers.ModelSerializer):\n"
+            code += model.get_serializers_code()
+            code += "\n"
+
+    def save_models(self):
+        file = open(f"{os.getcwd()}/{self.project_name}/{self.name}/models.py",
+                    'a')
+        file.write(self.get_models_code())
+        file.close()
+        return code
+
+    def save_serializers(self):
+        file = open(
+            f"{os.getcwd()}/{self.project_name}/{self.name}/serializers.py",
+            'w')
+        file.write(self.get_serializers_code())
         file.close()
 
     def save_views(self):
@@ -191,7 +248,7 @@ class Project:
     def __init__(self):
         self.apps = list()
         for app in setup_file.apps.keys():
-            self.apps.append(App(app))
+            self.apps.append(App(app, project_name))
         self.cmd = ProjectCommand(self.project_name)
         self.confs = ProjectConfigurations(self.project_name)
         self.timezone = None
@@ -281,7 +338,8 @@ class Project:
             #             view.get(view_name, view.get('template'),
             #                      view.get('options'), view.get('permissions'),
             #                      view.get('url_getters'))))
-            app.save_models(self.project_name)
+            app.save_models()
+            app.save_serializers()
         # save changes
         self.confs.save_settings()
         self.confs.save_urls()
