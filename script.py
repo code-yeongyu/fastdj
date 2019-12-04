@@ -135,7 +135,7 @@ class Field:
         self.field = field
         self.serializers = serializers
         self.options = options
-        if template == "model_owner":
+        if template == Template.model_owner:
             self.field = "ForeignKey"
             self.options = [
                 "'auth.user'", f"related_name='{app_name}_{name}'",
@@ -294,7 +294,7 @@ class Project:
             self.create_project()
             self.create_apps()
             self.register_apps()
-            self.makemigrations_and_migrate()
+            self.cmd.makemigrations_and_migrate()
 
     def create_venv(self):
         self.cmd.setup_venv()
