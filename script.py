@@ -90,11 +90,15 @@ class ProjectConfigurations:
         self.settings = self.settings.replace("ALLOWED_HOSTS = []",
                                               "ALLOWED_HOSTS = ['*']")
 
+    def add_url_include_module(self):
+        self.urls = self.urls.replace("from django.urls import path",
+                                      "from django.urls import path, include")
+
     def add_url_path(self, app_name):
         urlpatterns_index = self.urls.find("urlpatterns")
         last_path_index = self.urls.find(
             "]", urlpatterns_index) - 1  # except itself and the '\n
-        self.urls = f"{self.urls[:last_path_index]}\n\t# added by fastdj\n\tpath('{app_name}/', include('{app_name}.urls', name='{app_name}')){self.urls[last_path_index:]}\n"
+        self.urls = f"{self.urls[:last_path_index]}\n\t# added by fastdj\n\tpath('{app_name}/', include('{app_name}.urls'), name='{app_name}'),{self.urls[last_path_index:]}\n"
 
     def save_settings(self):
         file = open(self.settings_file_path, 'w')
@@ -109,6 +113,7 @@ class ProjectConfigurations:
 
 class Field:
     def __init__(self,
+                 app_name,
                  name,
                  template=None,
                  field=None,
@@ -121,7 +126,7 @@ class Field:
         if template == "model_owner":
             self.field = "ForeignKey"
             self.options = [
-                "'auth.user'", "related_name='article_writer'",
+                "'auth.user'", f"related_name='{app_name}_{name}'",
                 "on_delete=models.CASCADE", "null=False"
             ]
             self.serializers = {
@@ -324,7 +329,8 @@ class Project:
                 for field_name in fields_name:
                     field_specs = setup_file.apps[
                         app.name]['models'][model_name][field_name]
-                    field = Field(field_name, field_specs.get('template'),
+                    field = Field(app_name, field_name,
+                                  field_specs.get('template'),
                                   field_specs.get('field'),
                                   field_specs.get('options', list()),
                                   field_specs.get('serializers', {}))
