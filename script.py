@@ -294,7 +294,7 @@ class Project:
             self.create_project()
             self.create_apps()
             self.register_apps()
-            self.cmd.makemigrations_and_migrate()
+            self.makemigrations_and_migrate()
 
     def create_venv(self):
         self.cmd.setup_venv()
@@ -363,6 +363,10 @@ class Project:
         # save changes
         self.confs.save_settings()
         self.confs.save_urls()
+
+    def makemigrations_and_migrate(self):
+        self.cmd.makemigrations()
+        self.cmd.migrate()
 
 
 def main():
