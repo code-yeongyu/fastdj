@@ -42,6 +42,18 @@ class ProjectCommand:  # class about project initializing, like commands
         open(f"{os.getcwd()}/{app_name}/urls.py", 'w').close()
         os.chdir(origin_directory)
 
+    def makemigrations(self):
+        origin_directory = os.getcwd()
+        os.chdir(f"{os.getcwd()}/{self.prj_name}/")
+        os.system(f"python manage.py makemigrations")
+        os.chdir(origin_directory)
+
+    def migrate(self):
+        origin_directory = os.getcwd()
+        os.chdir(f"{os.getcwd()}/{self.prj_name}/")
+        os.system(f"python manage.py migrate")
+        os.chdir(origin_directory)
+
 
 class ProjectConfigurations:
     def __init__(self, project_name):
@@ -282,6 +294,7 @@ class Project:
             self.create_project()
             self.create_apps()
             self.register_apps()
+            self.makemigrations_and_migrate()
 
     def create_venv(self):
         self.cmd.setup_venv()
@@ -315,11 +328,12 @@ class Project:
             self.cmd.create_app(app.name)
 
     def register_apps(self):
+        #self.confs.add_url_include_module()
         for app in self.apps:
             app_name = app.name
             # add apps to confs and urls
             self.confs.add_module(app.name)
-            self.confs.add_url_path(app.name)
+            #self.confs.add_url_path(app.name)
             # register model spces to object
             models_name = setup_file.apps[app.name]['models'].keys()
             for model_name in models_name:
