@@ -34,15 +34,6 @@ apps = {
             "Article":{
                 "writer": {
                     "template": "model_owner"
-                    """
-                    replacable with:
-                        "field": "ForeignKey",
-                        "options": ["'auth.user'", "related_name='article_writer'", "on_delete=models.CASCADE", "null=False"],
-                        "serializers": { # check available fields at https://www.django-rest-framework.org/api-guide/fields/
-                            "options": ["source='writer.username"]
-                            "field": "ReadOnlyField",
-                        }
-                    """
                 },
                 "content": {
                     "field": "TextField",
