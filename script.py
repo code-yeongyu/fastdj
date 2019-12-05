@@ -304,7 +304,8 @@ class Project:
             self.create_project()
             self.create_apps()
             self.register_apps()
-            self.makemigrations_and_migrate()
+            # disabled till writing url feature is done
+            #self.makemigrations_and_migrate()
 
     def create_venv(self):
         self.cmd.setup_venv()
