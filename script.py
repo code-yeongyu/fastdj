@@ -337,42 +337,68 @@ class Project:
         for app in self.apps:
             self.cmd.create_app(app.name)
 
+    def get_serialized_field(self, app_name, field_name, field_specs):
+        return Field(app_name,
+                     field_name,
+                     field_specs.get('template'),
+                     field_specs.get('field'),
+                     field_specs.get('options', list()),
+                     field_specs.get('serializers', {}),
+                     choices=field_specs.get('choices'))
+
     def register_apps(self):
-        #self.confs.add_url_include_module()
+        self.confs.add_url_include_module()
         for app in self.apps:
-            app_name = app.name
             # add apps to confs and urls
             self.confs.add_module(app.name)
-            #self.confs.add_url_path(app.name)
+            self.confs.add_url_path(app.name)
             # register model spces to object
-            models_name = setup_file.apps[app.name]['models'].keys()
-            for model_name in models_name:
+            if app.name == 'custom_user':
                 model = Model(model_name)
-                fields_name = setup_file.apps[
-                    app.name]['models'][model_name].keys()
+                fields_name = field_specs = self.user_model.get(
+                    'fields').keys()
                 for field_name in fields_name:
-                    field_specs = setup_file.apps[
-                        app.name]['models'][model_name][field_name]
-                    field = Field(app_name, field_name,
-                                  field_specs.get('template'),
-                                  field_specs.get('field'),
-                                  field_specs.get('options', list()),
-                                  field_specs.get('serializers', {}))
-                    model.add_field(field)
+                    field_specs = self.user_model.get('fields').get(
+                        field_name)  # test required, not done yet
+                    model.add_field(
+                        self.get_serialized_field(app.name, field_name,
+                                                  field_specs))
                 app.add_model(model)
+            else:
+                models_name = setup_file.apps[app.name]['models'].keys()
+                for model_name in models_name:
+                    model = Model(model_name)
+                    fields_name = setup_file.apps[
+                        app.name]['models'][model_name].keys()
+                    for field_name in fields_name:
+                        field_specs = setup_file.apps[
+                            app.name]['models'][model_name][field_name]
+                        model.add_field(
+                            self.get_serialized_field(app.name, field_name,
+                                                      field_specs))
+                    app.add_model(model)
+
             # register view specs to object
-            # for view_name in setup_file.apps[app.name]['views'].keys():
-            #     view = setup_file.apps[app.name]['views'].get(view_name, None)
-            #     app.add_view(
-            #         View(
-            #             view.get(view_name, view.get('template'),
-            #                      view.get('options'), view.get('permissions'),
-            #                      view.get('url_getters'))))
+            if app.name == 'custom_user':
+                pass
+            else:
+                for view_name in setup_file.apps[app.name]['views'].keys():
+                    view = setup_file.apps[app.name]['views'].get(
+                        view_name, None)
+                    app.add_view(
+                        ViewSet(view.get(view_name),
+                                view.get('template'),
+                                view.get('options'),
+                                view.get('permissions'),
+                                view.get('url_getters'),
+                                owner_field_name=view.get(
+                                    'owner_field_name', None)))
             app.save_models()
             app.save_serializers()
-        # save changes
         self.confs.save_settings()
         self.confs.save_urls()
+
+        # save changes
 
     def makemigrations_and_migrate(self):
         self.cmd.makemigrations()
