@@ -133,15 +133,18 @@ class Field:
                  template=None,
                  field=None,
                  options=list(),
-                 serializers={}):
+                 serializers={},
+                 **kwargs):
         self.name = name
+        self.app_name = app_name
         self.field = field
         self.serializers = serializers
         self.options = options
+        self.choices = kwargs.get('choices')
         if template == Template.model_owner:
             self.field = "ForeignKey"
             self.options = [
-                "'auth.user'", f"related_name='{app_name}_{name}'",
+                "'auth.user'", f"related_name='{self.app_name}_{name}'",
                 "on_delete=models.CASCADE", "null=False"
             ]
             self.serializers = {
@@ -154,7 +157,11 @@ class Field:
         for option in self.options:
             options_str += option + ", "
         options_str = options_str[:-2]  # to remove last ", "
-        return f"\t{self.name} = models.{self.field}({options_str})\n"
+        code = ""
+        if not self.choices == None:
+            code += f"\t{self.app_name.upper()}_CHOICES = {self.choices}\n"
+        code += f"\t{self.name} = models.{self.field}({options_str})\n"
+        return code
 
 
 class Model:
