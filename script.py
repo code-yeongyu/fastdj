@@ -192,7 +192,7 @@ class Model:
         code += f"\t\tfields = ({fields_str})"
         return code
 
-    def get_models_code(self):
+    def get_model_code(self):
         code = f"class {self.name}(models.Model):\n"
         for field in self.fields:
             code += field.get_code()
@@ -233,12 +233,12 @@ class App:
         self.models.append(model)
 
     def add_view(self, view):
-        self.views.append(views)
+        self.views.append(view)
 
     def get_models_code(self):
         code = ""
         for model in self.models:
-            code += model.get_models_code() + "\n"
+            code += model.get_model_code() + "\n"
         return code
 
     def get_serializers_code(self):
