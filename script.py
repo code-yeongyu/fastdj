@@ -377,4 +377,9 @@ def main():
     project.menu()
 
 
-main()
+try:
+    main()
+except Exception as e:
+    print(e)
+    import shutil
+    shutil.rmtree(os.getcwd() + "/" + setup_file.project_name)
