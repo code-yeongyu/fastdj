@@ -274,23 +274,22 @@ class Project:
 
     def __init__(self):
         self.apps = list()
+
         for app in setup_file.apps.keys():
             self.apps.append(App(app, self.project_name))
+        self.apps.append(App('custom_user', self.project_name))
+
         self.cmd = ProjectCommand(self.project_name)
         self.confs = ProjectConfigurations(self.project_name)
         self.timezone = None
         self.language = None
-        self.use_token_auth = True
+        self.use_token_auth = self.user_model.get('use_token_auth', True)
         try:
             self.timezone = setup_file.timezone
         except:
             pass
         try:
             self.language = setup_file.language
-        except:
-            pass
-        try:
-            self.use_token_auth = setup_file.user_model.use_token_auth
         except:
             pass
 
