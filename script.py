@@ -200,24 +200,73 @@ class Model:
 
 
 class ViewSet:
-    def __init__(self,
-                 name,
-                 template,
-                 options=list(),
-                 permissions="",
-                 url_getters=None):
+    def __init__(self, app_name, name, template, model, options, permissions,
+                 url_getters, **kwargs):
         self.name = name
+        self.app_name = app_name
         self.template = template
+        self.model = model
         self.options = options
         self.permissions = permissions
         self.url_getters = url_getters
+        self.SERIALIZER = f"{self.model}Serializer"
         self.modules = list()
+        self.modules.append(f"from {self.app_name}.model import {self.model}")
+        self.modules.append(
+            f"from {self.app_name}.serializers import {self.SERIALIZER}")
+        self.owner_field_name = kwargs.get('owner_field_name')
+        self.code = str()
 
-    def get_code():
-        code = ""
-        if template == Template.detail_view:
+    def _use_generic_based_template_and_get_code(self):
+        self.modules.append("from rest_framework import generics")
+        self.modules.append("from rest_framework import permissions")
+        code = f"\tqueryset = {self.model}.objects.all()\n"
+        code += f"\tserializer_class = {self.SERIALIZER}\n"
+        code += f"\tpermission_classes = (permissions.{self.permissions})\n"
+        return code
+
+    def update_code(self):  # test required
+        code = str()
+        self.modules.append("from rest_framework.response import Response")
+        if self.template == Template.detail_view:
+            code = f"class {self.name}(generics.RetreiveAPIView):\n"
+            code += self._use_generic_based_template_and_get_code()
+        elif self.template == Template.detail_view_u:
             code = f"class {self.name}(generics.RetreiveUpdateAPIView):\n"
-            code += "\t"
+            code += self._use_generic_based_template_and_get_code()
+        elif self.template == Template.detail_view_d:
+            code = f"class {self.name}(generics.RetreiveDestroyAPIView):\n"
+            code += self._use_generic_based_template_and_get_code()
+        elif self.template == Template.detail_view_ud:
+            code = f"class {self.name}(generics.RetreiveUpdateDestroyAPIView):\n"
+            code += self._use_generic_based_template_and_get_code()
+        elif self.template == Template.all_objects_view:
+            self.modules.append("from django.http import JsonResponse")
+            code = f"class {self.name}(generics.ListAPIView, APIView):\n"
+            code += self._use_generic_based_template_and_get_code()
+            code += "\n\tdef post(self, request):\n"
+            code += "\t\tif request.user.is_authenticated:\n"
+            code += f"\t\t\tserializer = {self.SERIALIZER}(data=request.data)\n"
+            code += f"\t\t\tif serializer.is_valid():\n"
+            code += f"\t\t\t\tserializer.save({self.owner_field_name}=request.user)\n"
+            code += f"\t\t\t\treturn JsonResponse(serializer.data, status=status.HTTP_201_CREATED)\n"
+            code += f"\t\t\treturn Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)\n"
+            code += f"\t\treturn Response(status=status.HTTP_401_UNAUTHORIZED)\n"
+        elif self.template == Template.filter_objects_view:
+            self.modules.append(
+                "from rest_framework.decorators import api_view")
+            code = f"@api_view(['GET'])\n"
+            code += f"def {self.name}(request, {self.url_getters})\n"
+            options_str = ""
+            for option in self.options:
+                options_str += option + ", "
+            options_str = options_str[:-2]  # to remove last ", "
+            code += f"\tobject = get_object_or_404({self.model}, {options_str}).values()\n"
+            code += f"\treturn Response(object)"
+        self.code = code
+
+    def get_code(self):
+        return self.code
 
 
 class App:
@@ -237,6 +286,8 @@ class App:
 
     def get_models_code(self):
         code = ""
+        if self.name == "custom_user":
+            code += "from django.conf import settings"
         for model in self.models:
             code += model.get_model_code() + "\n"
         return code
@@ -250,6 +301,19 @@ class App:
             code += model.get_serializers_code()
             code += "\n"
         return code
+
+    def get_views_code(self):
+        modules_code = ""
+        code = ""
+        modules = list()
+        for view in self.views:
+            view.update_code()
+            for module in set(view.modules):
+                modules.append(module)
+            code += view.get_code() + "\n"
+        for module in set(modules):  # used set to remove duplicates
+            modules_code += module + "\n"
+        return modules_code + "\n" + code
 
     def save_models(self):
         file = open(f"{os.getcwd()}/{self.project_name}/{self.name}/models.py",
@@ -265,7 +329,16 @@ class App:
         file.close()
 
     def save_views(self):
-        pass
+        file = open(f"{os.getcwd()}/{self.project_name}/{self.name}/views.py",
+                    'w')
+        file.write(self.get_views_code())
+        file.close()
+
+    def save_views(self):
+        file = open(f"{os.getcwd()}/{self.project_name}/{self.name}/views.py",
+                    'w')
+        file.write(self.get_views_code())
+        file.close()
 
 
 class Project:
@@ -383,18 +456,20 @@ class Project:
                 pass
             else:
                 for view_name in setup_file.apps[app.name]['views'].keys():
-                    view = setup_file.apps[app.name]['views'].get(
-                        view_name, None)
+                    view = setup_file.apps[app.name]['views'].get(view_name)
                     app.add_view(
-                        ViewSet(view.get(view_name),
+                        ViewSet(app.name,
+                                view_name,
                                 view.get('template'),
-                                view.get('options'),
-                                view.get('permissions'),
-                                view.get('url_getters'),
+                                view.get('model'),
+                                view.get('options', list()),
+                                view.get('permissions', ""),
+                                view.get('url_getters', ""),
                                 owner_field_name=view.get(
                                     'owner_field_name', None)))
             app.save_models()
             app.save_serializers()
+            app.save_views()
         self.confs.save_settings()
         self.confs.save_urls()
 
