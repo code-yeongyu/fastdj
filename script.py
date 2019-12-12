@@ -5,15 +5,7 @@ except:
     print("Try with an argument")
     exit()
 
-
-class Template:
-    model_owner = "model_owner"
-    detail_view = "detail_view"
-    detail_view_u = "detail_view_u"
-    detail_view_d = "detail_view_d"
-    detail_view_ud = "detail_view_ud"
-    all_objects_view = "all_objects_view"
-    filter_objects_view = "filter_objects_view"
+from template import Template
 
 
 class ProjectCommand:  # class about project initializing, like commands
