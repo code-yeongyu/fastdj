@@ -145,13 +145,13 @@ class Field:
             }
 
     def get_code(self):
+        if not self.choices == None:
+            self.options.append(f"choices={self.choices}")
         options_str = ""
         for option in self.options:
             options_str += option + ", "
         options_str = options_str[:-2]  # to remove last ", "
         code = ""
-        if not self.choices == None:
-            code += f"\t{self.app_name.upper()}_CHOICES = {self.choices}\n"
         code += f"\t{self.name} = models.{self.field}({options_str})\n"
         return code
 
@@ -192,27 +192,29 @@ class Model:
 
 
 class ViewSet:
-    def __init__(self, app_name, name, template, model, options, permissions,
-                 url_getters, **kwargs):
+    def __init__(self, app_name, name, **kwargs):
         self.name = name
         self.app_name = app_name
-        self.template = template
-        self.model = model
-        self.options = options
-        self.permissions = permissions
-        self.url_getters = url_getters
-        self.SERIALIZER = f"{self.model}Serializer"
+        self.template = kwargs.get('template')
+        self.model_name = kwargs.get('model_name')
+        self.options = kwargs.get('options', list())
+        self.permissions = kwargs.get('permissions', "")
+        self.url_getters = kwargs.get('url_getters', "")
+        self.SERIALIZER = f"{self.model_name}Serializer"
         self.modules = list()
-        self.modules.append(f"from {self.app_name}.model import {self.model}")
+        self.modules.append(
+            f"from {self.app_name}.model import {self.model_name}")
         self.modules.append(
             f"from {self.app_name}.serializers import {self.SERIALIZER}")
         self.owner_field_name = kwargs.get('owner_field_name')
         self.code = str()
 
-    def _use_generic_based_template_and_get_code(self):
+    def _use_generic_based_template(self):
         self.modules.append("from rest_framework import generics")
         self.modules.append("from rest_framework import permissions")
-        code = f"\tqueryset = {self.model}.objects.all()\n"
+
+    def _get_template_code(self):
+        code = f"\tqueryset = {self.model_name}.objects.all()\n"
         code += f"\tserializer_class = {self.SERIALIZER}\n"
         code += f"\tpermission_classes = (permissions.{self.permissions})\n"
         return code
@@ -221,21 +223,26 @@ class ViewSet:
         code = str()
         self.modules.append("from rest_framework.response import Response")
         if self.template == Template.detail_view:
+            self._use_generic_based_template()
             code = f"class {self.name}(generics.RetreiveAPIView):\n"
-            code += self._use_generic_based_template_and_get_code()
+            code += self._get_template_code()
         elif self.template == Template.detail_view_u:
+            self._use_generic_based_template()
             code = f"class {self.name}(generics.RetreiveUpdateAPIView):\n"
-            code += self._use_generic_based_template_and_get_code()
+            code += self._get_template_code()
         elif self.template == Template.detail_view_d:
+            self._use_generic_based_template()
             code = f"class {self.name}(generics.RetreiveDestroyAPIView):\n"
-            code += self._use_generic_based_template_and_get_code()
+            code += self._get_template_code()
         elif self.template == Template.detail_view_ud:
+            self._use_generic_based_template()
             code = f"class {self.name}(generics.RetreiveUpdateDestroyAPIView):\n"
-            code += self._use_generic_based_template_and_get_code()
+            code += self._get_template_code()
         elif self.template == Template.all_objects_view:
+            self._use_generic_based_template()
             self.modules.append("from django.http import JsonResponse")
             code = f"class {self.name}(generics.ListAPIView, APIView):\n"
-            code += self._use_generic_based_template_and_get_code()
+            code += self._get_template_code()
             code += "\n\tdef post(self, request):\n"
             code += "\t\tif request.user.is_authenticated:\n"
             code += f"\t\t\tserializer = {self.SERIALIZER}(data=request.data)\n"
@@ -253,8 +260,30 @@ class ViewSet:
             for option in self.options:
                 options_str += option + ", "
             options_str = options_str[:-2]  # to remove last ", "
-            code += f"\tobject = get_object_or_404({self.model}, {options_str}).values()\n"
+            code += f"\tobject = get_object_or_404({self.model_name}, {options_str}).values()\n"
             code += f"\treturn Response(object)"
+        elif self.template == Template.user_register_view:
+            self.modules.append(
+                "from rest_framework.decorators import api_view")
+            self.modules.append(
+                f"from {self.app_name}.forms import RegisterForm")
+            code = f"""@api_view(['POST'])
+def register(request):  # 회원가입
+    form = RegisterForm(request.POST)
+    if form.is_valid():
+        user = form.save(commit=False)
+        user.save()
+        profile = Profile.objects.get(user=user)
+        serializer = ProfileSerializer(profile, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+        return Response(status=status.HTTP_201_CREATED)
+    return Response(form.errors, status=status.HTTP_406_NOT_ACCEPTABLE)
+            """
+            import pdb
+            pdb.set_trace()
+        else:
+            code = ""
         self.code = code
 
     def get_code(self):
@@ -279,7 +308,7 @@ class App:
     def get_models_code(self):
         code = ""
         if self.name == "custom_user":
-            code += "from django.conf import settings"
+            code += "from django.conf import settings\n"
         for model in self.models:
             code += model.get_model_code() + "\n"
         return code
@@ -419,7 +448,7 @@ class Project:
             self.confs.add_url_path(app.name)
             # register model spces to object
             if app.name == 'custom_user':
-                model = Model(model_name)
+                model = Model("Profile")
                 fields_name = field_specs = self.user_model.get(
                     'fields').keys()
                 for field_name in fields_name:
@@ -428,6 +457,7 @@ class Project:
                     model.add_field(
                         self.get_serialized_field(app.name, field_name,
                                                   field_specs))
+                model.add_field(self, get)
                 app.add_model(model)
             else:
                 models_name = setup_file.apps[app.name]['models'].keys()
@@ -445,18 +475,30 @@ class Project:
 
             # register view specs to object
             if app.name == 'custom_user':
-                pass
+                if self.user_model.get('set_visibility_public', True):
+                    app.add_view(
+                        ViewSet(app.name,
+                                "register",
+                                template=Template.user_register_view,
+                                model_name="Profile"))
+                app.add_view(
+                    ViewSet(
+                        app.name,
+                        "ProfileAPIView",
+                        model_name="Profile",
+                    ))
+
             else:
                 for view_name in setup_file.apps[app.name]['views'].keys():
                     view = setup_file.apps[app.name]['views'].get(view_name)
                     app.add_view(
                         ViewSet(app.name,
                                 view_name,
-                                view.get('template'),
-                                view.get('model'),
-                                view.get('options', list()),
-                                view.get('permissions', ""),
-                                view.get('url_getters', ""),
+                                template=view.get('template'),
+                                model_name=view.get('model'),
+                                options=view.get('options', list()),
+                                permissions=view.get('permissions', ""),
+                                url_getters=view.get('url_getters', ""),
                                 owner_field_name=view.get(
                                     'owner_field_name', None)))
             app.save_models()
