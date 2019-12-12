@@ -3,6 +3,7 @@ project_name = "community"  # snake_case suggested
 user_model = {
     "token_auth": True,  # set to use token auth to authenticate
     "allow_register": True,  # set to use auto-craeted register function
+    "set_visibility_public": True,
     "fields":
     {  # check available fields at https://docs.djangoproject.com/en/2.2/ref/models/fields/
         "nickname": {
