@@ -99,56 +99,56 @@ class ViewSet:
         return code
 
     def update_code(self):  # test required
-        code = str()
+        self.code = ""
         self.modules.append("from rest_framework.response import Response")
         if self.template == Template.detail_view:
             self._use_generic_based_template()
-            code = f"class {self.name}(generics.RetreiveAPIView):\n"
-            code += self._get_template_code()
+            self.code = f"class {self.name}(generics.RetreiveAPIView):\n"
+            self.code += self._get_template_code()
         elif self.template == Template.detail_view_u:
             self._use_generic_based_template()
-            code = f"class {self.name}(generics.RetreiveUpdateAPIView):\n"
-            code += self._get_template_code()
+            self.code = f"class {self.name}(generics.RetreiveUpdateAPIView):\n"
+            self.code += self._get_template_code()
         elif self.template == Template.detail_view_d:
             self._use_generic_based_template()
-            code = f"class {self.name}(generics.RetreiveDestroyAPIView):\n"
-            code += self._get_template_code()
+            self.code = f"class {self.name}(generics.RetreiveDestroyAPIView):\n"
+            self.code += self._get_template_code()
         elif self.template == Template.detail_view_ud:
             self._use_generic_based_template()
-            code = f"class {self.name}(generics.RetreiveUpdateDestroyAPIView):\n"
-            code += self._get_template_code()
+            self.code = f"class {self.name}(generics.RetreiveUpdateDestroyAPIView):\n"
+            self.code += self._get_template_code()
         elif self.template == Template.all_objects_view:
             self._use_generic_based_template()
             self.modules.append("from django.http import JsonResponse")
-            code = f"class {self.name}(generics.ListAPIView, APIView):\n"
-            code += self._get_template_code()
-            code += "\n\tdef post(self, request):\n"
-            code += "\t\tif request.user.is_authenticated:\n"
-            code += f"\t\t\tserializer = {self.SERIALIZER}(data=request.data)\n"
-            code += f"\t\t\tif serializer.is_valid():\n"
-            code += f"\t\t\t\tserializer.save({self.owner_field_name}=request.user)\n"
-            code += f"\t\t\t\treturn JsonResponse(serializer.data, status=status.HTTP_201_CREATED)\n"
-            code += f"\t\t\treturn Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)\n"
-            code += f"\t\treturn Response(status=status.HTTP_401_UNAUTHORIZED)\n"
+            self.code = f"class {self.name}(generics.ListAPIView, APIView):\n"
+            self.code += self._get_template_code()
+            self.code += "\n\tdef post(self, request):\n"
+            self.code += "\t\tif request.user.is_authenticated:\n"
+            self.code += f"\t\t\tserializer = {self.SERIALIZER}(data=request.data)\n"
+            self.code += f"\t\t\tif serializer.is_valid():\n"
+            self.code += f"\t\t\t\tserializer.save({self.owner_field_name}=request.user)\n"
+            self.code += f"\t\t\t\treturn JsonResponse(serializer.data, status=status.HTTP_201_CREATED)\n"
+            self.code += f"\t\t\treturn Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)\n"
+            self.code += f"\t\treturn Response(status=status.HTTP_401_UNAUTHORIZED)\n"
         elif self.template == Template.filter_objects_view:
             self.modules.append(
                 "from rest_framework.decorators import api_view")
             self.modules.append(
                 "from django.shortcuts import get_object_or_404")
-            code = f"@api_view(['GET'])\n"
-            code += f"def {self.name}(request, {self.url_getters})\n"
+            self.code = f"@api_view(['GET'])\n"
+            self.code += f"def {self.name}(request, {self.url_getters})\n"
             options_str = ""
             for option in self.options:
                 options_str += option + ", "
             options_str = options_str[:-2]  # to remove last ", "
-            code += f"\tobject = get_object_or_404({self.model_name}, {options_str}).values()\n"
-            code += f"\treturn Response(object)"
+            self.code += f"\tobject_to_return = get_object_or_404({self.model_name}, {options_str}).values()\n"
+            self.code += f"\treturn Response(object_to_return)"
         elif self.template == Template.user_register_view:
             self.modules.append(
                 "from rest_framework.decorators import api_view")
             self.modules.append(
                 f"from {self.app_name}.forms import RegisterForm")
-            code = f"""@api_view(['POST'])
+            self.code = """@api_view(['POST'])
 def register(request):  # 회원가입
     form = RegisterForm(request.POST)
     if form.is_valid():
@@ -162,8 +162,7 @@ def register(request):  # 회원가입
     return Response(form.errors, status=status.HTTP_406_NOT_ACCEPTABLE)
             """
         else:
-            code = ""
-        self.code = code
+            self.code = ""
 
     def get_code(self):
         return self.code

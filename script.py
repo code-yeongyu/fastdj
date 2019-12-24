@@ -194,13 +194,15 @@ class Project:
     def get_serialized_field(
         self, app_name, field_name, field_specs
     ):  # get informations from object field_specs and return it as serialized object Field
-        return Field(field_name,
-                     field_specs.get('field'),
-                     app_name=app_name,
-                     serializers=field_specs.get('serializers', {}),
-                     options=field_specs.get('options', list()),
-                     template=field_specs.get('template'),
-                     choices=field_specs.get('choices'))
+        return Field(
+            field_name,
+            field_specs.get('field'),
+            app_name=app_name,
+            serializers=field_specs.get('serializers', {}),
+            options=field_specs.get('options', list()),
+            template=field_specs.get('template'),
+            choices=field_specs.get('choices'),
+        )
 
     def register_apps(self):
         self.confs.add_url_include_module()
@@ -220,12 +222,15 @@ class Project:
                         self.get_serialized_field(app.name, field_name,
                                                   field_specs))
                 model.add_field(
-                    Field("user",
-                          "OneToOneField",
-                          options=[
-                              "settings.AUTH_USER_MODEL",
-                              "on_delete=models.CASCADE"
-                          ]))
+                    Field(
+                        "user",
+                        "OneToOneField",
+                        options=[
+                            "settings.AUTH_USER_MODEL",
+                            "on_delete=models.CASCADE"
+                        ],
+                        not_to_serialize=True,
+                    ))
                 app.add_model(model)
             else:
                 models_name = setup_file.apps[app.name]['models'].keys()
