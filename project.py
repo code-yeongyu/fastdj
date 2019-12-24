@@ -3,24 +3,19 @@ from template import Template
 
 
 class Field:
-    def __init__(self,
-                 app_name,
-                 name,
-                 template=None,
-                 field=None,
-                 options=list(),
-                 serializers={},
-                 **kwargs):
-        self.name = name
-        self.app_name = app_name
-        self.field = field
-        self.serializers = serializers
-        self.options = options
+    def __init__(self, field_name, field_type=None, **kwargs):
+        self.field_name = field_name
+        self.field_type = field_type
+        self.app_name = kwargs.get('app_name')
+        self.serializers = kwargs.get('serializers', {})
+        self.options = kwargs.get('options', [])
         self.choices = kwargs.get('choices')
+        template = kwargs.get('template')
+
         if template == Template.model_owner:
-            self.field = "ForeignKey"
+            self.field_type = "ForeignKey"
             self.options = [
-                "'auth.user'", f"related_name='{self.app_name}_{name}'",
+                "'auth.user'", f"related_name='{self.app_name}_{field_name}'",
                 "on_delete=models.CASCADE", "null=False"
             ]
             self.serializers = {
@@ -36,7 +31,7 @@ class Field:
             options_str += option + ", "
         options_str = options_str[:-2]  # to remove last ", "
         code = ""
-        code += f"\t{self.name} = models.{self.field}({options_str})\n"
+        code += f"\t{self.field_name} = models.{self.field_type}({options_str})\n"
         return code
 
 
@@ -58,12 +53,12 @@ class Model:
             field_object = field.serializers.get('field')
             if field_object == None:
                 break
-            code += f"\t{field.name} = serializers.{field_object}({options_str})\n"
+            code += f"\t{field.field_name} = serializers.{field_object}({options_str})\n"
         code += "\tclass Meta:\n"
         code += f"\t\tmodel = {self.name}\n"
         fields_str = ""
         for field in self.fields:
-            fields_str += field.name + ", "
+            fields_str += field.field_name + ", "
         fields_str = fields_str[:-2]  # to remove last ", "
         code += f"\t\tfields = ({fields_str})"
         return code
