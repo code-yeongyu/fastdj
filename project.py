@@ -10,6 +10,7 @@ class Field:
         self.serializers = kwargs.get('serializers', {})
         self.options = kwargs.get('options', [])
         self.choices = kwargs.get('choices')
+        self.not_to_serialize = kwargs.get('not_to_serialize', False)
         template = kwargs.get('template')
 
         if template == Template.model_owner:
@@ -58,6 +59,8 @@ class Model:
         code += f"\t\tmodel = {self.name}\n"
         fields_str = ""
         for field in self.fields:
+            if field.not_to_serialize:
+                continue
             fields_str += field.field_name + ", "
         fields_str = fields_str[:-2]  # to remove last ", "
         code += f"\t\tfields = ({fields_str})"
