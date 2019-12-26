@@ -179,6 +179,7 @@ class App:
         self.views = list()
         self.models_code = ""
         self.views_code = ""
+        self.APP_PATH = f"{os.getcwd()}/{self.project_name}/{self.name}/"
 
     def add_model(self, model):
         self.models.append(model)
@@ -204,6 +205,23 @@ class App:
             code += "\n"
         return code
 
+    def get_forms_code(self):
+        # form feature currently only supported on custom profile features
+        code = ""
+        if self.name == "custom_user":
+            code = """from django import forms
+    from django.contrib.auth.forms import UserCreationForm
+    from django.contrib.auth.models import User
+
+
+    class RegisterForm(UserCreationForm):
+        email = forms.EmailField(max_length=200, help_text='Required')
+
+        class Meta:
+            model = User
+            fields = ('username', 'email', 'password1', 'password2')"""
+        return code
+
     def get_views_code(self):
         modules_code = ""
         code = ""
@@ -218,26 +236,29 @@ class App:
         return modules_code + "\n" + code
 
     def save_models(self):
-        file = open(f"{os.getcwd()}/{self.project_name}/{self.name}/models.py",
-                    'a')
+        file = open(self.APP_PATH + "models.py", 'a')
         file.write(self.get_models_code())
         file.close()
 
     def save_serializers(self):
-        file = open(
-            f"{os.getcwd()}/{self.project_name}/{self.name}/serializers.py",
-            'w')
+        file = open(self.APP_PATH + "serializers.py", 'w')
         file.write(self.get_serializers_code())
         file.close()
 
     def save_views(self):
-        file = open(f"{os.getcwd()}/{self.project_name}/{self.name}/views.py",
-                    'w')
+        file = open(self.APP_PATH + "views.py", 'w')
         file.write(self.get_views_code())
         file.close()
 
     def save_views(self):
-        file = open(f"{os.getcwd()}/{self.project_name}/{self.name}/views.py",
-                    'w')
+        file = open(self.APP_PATH + "views.py", 'w')
         file.write(self.get_views_code())
+        file.close()
+
+    def save_forms(self):
+        code = self.get_forms_code()
+        if code == "":
+            return
+        file = open(self.APP_PATH + "forms.py", 'w')
+        file.write(code)
         file.close()

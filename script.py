@@ -277,6 +277,7 @@ class Project:
             app.save_models()
             app.save_serializers()
             app.save_views()
+            app.save_forms()
         self.confs.save_settings()
         self.confs.save_urls()
 
