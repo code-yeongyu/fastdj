@@ -152,7 +152,7 @@ class ViewSet:
             self.modules.append(
                 f"from {self.app_name}.forms import RegisterForm")
             self.code = """@api_view(['POST'])
-def register(request):  # 회원가입
+def register(request):
     form = RegisterForm(request.POST)
     if form.is_valid():
         user = form.save(commit=False)
@@ -206,20 +206,45 @@ class App:
         return code
 
     def get_forms_code(self):
-        # form feature currently only supported on custom profile features
+        # form feature currently supported limitedly for custom profile features
         code = ""
         if self.name == "custom_user":
             code = """from django import forms
-    from django.contrib.auth.forms import UserCreationForm
-    from django.contrib.auth.models import User
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
 
 
-    class RegisterForm(UserCreationForm):
-        email = forms.EmailField(max_length=200, help_text='Required')
+class RegisterForm(UserCreationForm):
+    email = forms.EmailField(max_length=200, help_text='Required')
 
-        class Meta:
-            model = User
-            fields = ('username', 'email', 'password1', 'password2')"""
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'password1', 'password2')"""
+        return code
+
+    def get_admin_code(self):
+        # form feature currently supported limitedly for custom profile features
+        code = ""
+        if self.name == "custom_user":
+            code = """from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
+from django_apps.custom_profile.models import Profile
+
+
+class ProfileInline(admin.StackedInline):
+    model = Profile
+    can_delete = False
+    verbose_name_plural = 'profile'
+
+
+class UserAdmin(UserAdmin):
+    inlines = (ProfileInline, )
+
+
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin) """
+        print(self.name, code)
         return code
 
     def get_views_code(self):
@@ -260,5 +285,13 @@ class App:
         if code == "":
             return
         file = open(self.APP_PATH + "forms.py", 'w')
+        file.write(code)
+        file.close()
+
+    def save_admin_file(self):
+        code = self.get_admin_code()
+        if code == "":
+            return
+        file = open(self.APP_PATH + "admin.py", 'w')
         file.write(code)
         file.close()
