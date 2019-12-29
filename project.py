@@ -74,11 +74,11 @@ class Model:
 
 
 class ViewSet:
-    def __init__(self, app_name, name, **kwargs):
-        self.name = name
+    def __init__(self, app_name, model_name, template, **kwargs):
         self.app_name = app_name
-        self.template = kwargs.get('template')
-        self.model_name = kwargs.get('model_name')
+        self.model_name = model_name
+        self.template = template
+        self.name = kwargs.get('name')
         self.options = kwargs.get('options', list())
         self.permissions = kwargs.get('permissions', "")
         self.url_getters = kwargs.get('url_getters', "")
@@ -127,15 +127,19 @@ class ViewSet:
             self._use_generic_based_template()
             self.modules.append("from django.http import JsonResponse")
             self.code = f"class {self.name}(generics.ListAPIView, APIView):\n"
-            self.code += self._get_template_code()
-            self.code += "\n\tdef post(self, request):\n"
-            self.code += "\t\tif request.user.is_authenticated:\n"
-            self.code += f"\t\t\tserializer = {self.SERIALIZER}(data=request.data)\n"
-            self.code += f"\t\t\tif serializer.is_valid():\n"
-            self.code += f"\t\t\t\tserializer.save({self.owner_field_name}=request.user)\n"
-            self.code += f"\t\t\t\treturn JsonResponse(serializer.data, status=status.HTTP_201_CREATED)\n"
-            self.code += f"\t\t\treturn Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)\n"
-            self.code += f"\t\treturn Response(status=status.HTTP_401_UNAUTHORIZED)\n"
+            self.code = f"""class {self.name}(generics.ListAPIView, APIView):
+{self._get_template_code()}
+    def post(self, request):
+        if request.user.is_authenticated:
+            serializer = {self.SERIALIZER}(data=request.data)
+            if serializer.is_valid():
+                serializer = {self.SERIALIZER}(data=request.data)
+                if serializer.is_valid():
+                    serializer.save({self.owner_field_name}=request.user)
+                    return JsonResponse(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_401_UNAUTHORIZED)
+        """
         elif self.template == Template.filter_objects_view:
             self.modules.append(
                 "from rest_framework.decorators import api_view")
@@ -154,14 +158,14 @@ class ViewSet:
                 "from rest_framework.decorators import api_view")
             self.modules.append(
                 f"from {self.app_name}.forms import RegisterForm")
-            self.code = """@api_view(['POST'])
+            self.code = f"""@api_view(['POST'])
 def register(request):
     form = RegisterForm(request.POST)
     if form.is_valid():
         user = form.save(commit=False)
         user.save()
-        profile = Profile.objects.get(user=user)
-        serializer = ProfileSerializer(profile, data=request.data)
+        profile = {self.model_name}.objects.get(user=user)
+        serializer = {self.SERIALIZER}(profile, data=request.data)
         if serializer.is_valid():
             serializer.save()
         return Response(status=status.HTTP_201_CREATED)

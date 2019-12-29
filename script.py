@@ -266,9 +266,9 @@ class Project:
                     view = setup_file.apps[app.name]['views'].get(view_name)
                     app.add_view(
                         ViewSet(app.name,
-                                view_name,
-                                template=view.get('template'),
-                                model_name=view.get('model'),
+                                view.get('model'),
+                                view.get('template'),
+                                name=view_name,
                                 options=view.get('options', list()),
                                 permissions=view.get('permissions', ""),
                                 url_getters=view.get('url_getters', ""),
