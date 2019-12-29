@@ -8,6 +8,7 @@ except:
 from project import Field
 from project import Model
 from project import ViewSet
+from project import Route
 from project import App
 
 from template import Template
@@ -51,6 +52,12 @@ class ProjectCommand:  # class about project initializing, like commands
         origin_directory = os.getcwd()
         os.chdir(f"{os.getcwd()}/{self.prj_name}/")
         os.system(f"python manage.py migrate")
+        os.chdir(origin_directory)
+
+    def run_server(self):
+        origin_directory = os.getcwd()
+        os.chdir(f"{os.getcwd()}/{self.prj_name}/")
+        os.system(f"python manage.py runserver")
         os.chdir(origin_directory)
 
 
@@ -235,7 +242,7 @@ class Project:
             else:
                 models_name = setup_file.apps[app.name]['models'].keys()
                 for model_name in models_name:
-                    model = Model(model_name)
+                    model = Model(model_name[0].upper() + model_name[1:])
                     fields_name = setup_file.apps[
                         app.name]['models'][model_name].keys()
                     for field_name in fields_name:
@@ -254,13 +261,11 @@ class Project:
                         "Profile",
                         Template.user_profile_view,
                     ))
-                if self.user_model.get('allow_register', True):
-                    app.add_view(
-                        ViewSet(
-                            app.name,
-                            "Profile",
-                            Template.user_register_view,
-                        ))
+                app.add_route(
+                    Route("",
+                          viewset_name_to_route="ProfileAPIView",
+                          template=Template.user_profile_view,
+                          arg_type=None))
                 if self.user_model.get('set_visibility_public', True):
                     app.add_view(
                         ViewSet(
@@ -268,7 +273,19 @@ class Project:
                             "Profile",
                             Template.user_profile_detail_view,
                         ))
-
+                    app.add_route(
+                        Route("",
+                              viewset_name_to_route="ProfileDetail",
+                              template=Template.user_profile_detail_view,
+                              arg_type=str))
+                if self.user_model.get('allow_register', True):
+                    app.add_view(
+                        ViewSet(
+                            app.name,
+                            "Profile",
+                            Template.user_register_view,
+                        ))
+                    app.add_route(Route("register", arg_type=None))
             else:
                 for view_name in setup_file.apps[app.name]['views'].keys():
                     view = setup_file.apps[app.name]['views'].get(view_name)
@@ -282,13 +299,18 @@ class Project:
                                 url_getters=view.get('url_getters', ""),
                                 owner_field_name=view.get(
                                     'owner_field_name', None)))
+                    app.add_route(
+                        Route(view_name, template=view.get('template')))
             app.save_models()
             app.save_serializers()
             app.save_views()
             app.save_forms()
             app.save_admin_file()
+            app.save_routings()
         self.confs.save_settings()
         self.confs.save_urls()
+        self.makemigrations_and_migrate()
+        self.cmd.run_server()
 
         # save changes
 

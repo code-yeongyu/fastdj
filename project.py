@@ -1,4 +1,4 @@
-import os
+import os, enum
 from template import Template
 
 
@@ -32,7 +32,7 @@ class Field:
             options_str += option + ", "
         options_str = options_str[:-2]  # to remove last ", "
         code = ""
-        code += f"\t{self.field_name} = models.{self.field_type}({options_str})\n"
+        code += f"    {self.field_name} = models.{self.field_type}({options_str})\n"
         return code
 
 
@@ -54,16 +54,16 @@ class Model:
             field_object = field.serializers.get('field')
             if field_object == None:
                 break
-            code += f"\t{field.field_name} = serializers.{field_object}({options_str})\n"
-        code += "\tclass Meta:\n"
-        code += f"\t\tmodel = {self.name}\n"
+            code += f"    {field.field_name} = serializers.{field_object}({options_str})\n"
+        code += "    class Meta:\n"
+        code += f"        model = {self.name}\n"
         fields_str = ""
         for field in self.fields:
             if field.not_to_serialize:
                 continue
-            fields_str += field.field_name + ", "
+            fields_str += f"'{field.field_name}', "
         fields_str = fields_str[:-2]  # to remove last ", "
-        code += f"\t\tfields = ({fields_str})"
+        code += f"        fields = ({fields_str})"
         return code
 
     def get_model_code(self):
@@ -85,7 +85,7 @@ class ViewSet:
         self.SERIALIZER = f"{self.model_name}Serializer"
         self.modules = list()
         self.modules.append(
-            f"from {self.app_name}.model import {self.model_name}")
+            f"from {self.app_name}.models import {self.model_name}")
         self.modules.append(
             f"from {self.app_name}.serializers import {self.SERIALIZER}")
         self.owner_field_name = kwargs.get('owner_field_name')
@@ -96,9 +96,9 @@ class ViewSet:
         self.modules.append("from rest_framework import permissions")
 
     def _get_template_code(self):
-        code = f"\tqueryset = {self.model_name}.objects.all()\n"
-        code += f"\tserializer_class = {self.SERIALIZER}\n"
-        code += f"\tpermission_classes = (permissions.{self.permissions})\n"
+        code = f"    queryset = {self.model_name}.objects.all()\n"
+        code += f"    serializer_class = {self.SERIALIZER}\n"
+        code += f"    permission_classes = (permissions.{self.permissions})\n"
         return code
 
     def get_code(self):
@@ -109,24 +109,24 @@ class ViewSet:
         self.modules.append("from rest_framework.response import Response")
         if self.template == Template.detail_view:
             self._use_generic_based_template()
-            self.code = f"class {self.name}(generics.RetreiveAPIView):\n"
+            self.code = f"class {self.name}(generics.RetrieveAPIView):\n"
             self.code += self._get_template_code()
         elif self.template == Template.detail_view_u:
             self._use_generic_based_template()
-            self.code = f"class {self.name}(generics.RetreiveUpdateAPIView):\n"
+            self.code = f"class {self.name}(generics.RetrieveUpdateAPIView):\n"
             self.code += self._get_template_code()
         elif self.template == Template.detail_view_d:
             self._use_generic_based_template()
-            self.code = f"class {self.name}(generics.RetreiveDestroyAPIView):\n"
+            self.code = f"class {self.name}(generics.RetrieveDestroyAPIView):\n"
             self.code += self._get_template_code()
         elif self.template == Template.detail_view_ud:
             self._use_generic_based_template()
-            self.code = f"class {self.name}(generics.RetreiveUpdateDestroyAPIView):\n"
+            self.code = f"class {self.name}(generics.RetrieveUpdateDestroyAPIView):\n"
             self.code += self._get_template_code()
         elif self.template == Template.all_objects_view:
             self._use_generic_based_template()
+            self.modules.append("from rest_framework.views import APIView")
             self.modules.append("from django.http import JsonResponse")
-            self.code = f"class {self.name}(generics.ListAPIView, APIView):\n"
             self.code = f"""class {self.name}(generics.ListAPIView, APIView):
 {self._get_template_code()}
     def post(self, request):
@@ -146,13 +146,13 @@ class ViewSet:
             self.modules.append(
                 "from django.shortcuts import get_object_or_404")
             self.code = f"@api_view(['GET'])\n"
-            self.code += f"def {self.name}(request, {self.url_getters})\n"
+            self.code += f"def {self.name}(request, {self.url_getters}):\n"
             options_str = ""
             for option in self.options:
                 options_str += option + ", "
             options_str = options_str[:-2]  # to remove last ", "
-            self.code += f"\tobject_to_return = get_object_or_404({self.model_name}, {options_str}).values()\n"
-            self.code += f"\treturn Response(object_to_return)"
+            self.code += f"    object_to_return = get_object_or_404({self.model_name}, {options_str}).values()\n"
+            self.code += f"    return Response(object_to_return)"
         elif self.template == Template.user_register_view:
             self.modules.append(
                 "from rest_framework.decorators import api_view")
@@ -209,18 +209,62 @@ def register(request):
             self.code = ""
 
 
+class Route:
+    code = ""
+
+    def __init__(self, view_name, **kwargs):
+        self.view_name = view_name
+        self.viewset_name_to_route = kwargs.get('viewset_name_to_route',
+                                                view_name)
+        template = kwargs.get('template')
+        if template is not None:
+            if not (template == Template.filter_objects_view
+                    or template == Template.user_register_view):
+                self.viewset_name_to_route += ".as_view()"
+            if ("detail" in template) or (
+                    template == Template.all_objects_view):
+                view_name = ""
+
+        arg_type = kwargs.get('arg_type', Route.template_to_arg_type(template))
+
+        if view_name == "":
+            self.code = ""
+        else:
+            self.code = f"{view_name.lower()}/"
+        if arg_type == int:
+            self.code += "<int:id>/"
+        elif arg_type == str:
+            self.code += "<string>/"
+
+    @staticmethod
+    def template_to_arg_type(template):
+        if template == Template.detail_view or template == Template.detail_view_u or template == Template.detail_view_d or template == Template.detail_view_ud:
+            return int
+        if template == Template.user_profile_detail_view:
+            return str
+        else:
+            return None
+
+    def get_code(self):
+        return self.code
+
+
 class App:
     def __init__(self, name, project_name):
         self.name = name
         self.project_name = project_name
         self.models = list()
         self.views = list()
+        self.routes = list()
         self.models_code = ""
         self.views_code = ""
         self.APP_PATH = f"{os.getcwd()}/{self.project_name}/{self.name}/"
 
     def add_model(self, model):
         self.models.append(model)
+
+    def add_route(self, url):
+        self.routes.append(url)
 
     def add_view(self, view):
         self.views.append(view)
@@ -235,12 +279,13 @@ class App:
 
     def get_serializers_code(self):
         code = "from rest_framework import serializers\n"
-        code += f"from {self.name}.models import {self.name}\n"
-
+        for model in self.models:
+            code += f"from {self.name}.models import {model.name}\n"
+        code += "\n\n"
         for model in self.models:
             code += f"class {model.name}Serializer(serializers.ModelSerializer):\n"
             code += model.get_serializers_code()
-            code += "\n"
+            code += "\n\n"
         return code
 
     def get_forms_code(self):
@@ -261,13 +306,13 @@ class RegisterForm(UserCreationForm):
         return code
 
     def get_admin_code(self):
-        # form feature currently supported limitedly for custom profile features
+        # admin feature currently supported limitedly for custom profile features
         code = ""
         if self.name == "custom_user":
             code = """from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
-from django_apps.custom_profile.models import Profile
+from custom_user.models import Profile
 
 
 class ProfileInline(admin.StackedInline):
@@ -295,7 +340,25 @@ admin.site.register(User, UserAdmin) """
             code += view.get_code() + "\n"
         for module in set(modules):  # set used to remove duplicates
             modules_code += module + "\n"
-        return modules_code + "\n" + code
+        return modules_code + "\n\n" + code
+
+    def get_routes_code(self):
+        routes_list = list()
+        routes_code = ""
+        for route in self.routes:
+            routes_list.append(
+                f"    path('{route.get_code()}', views.{route.viewset_name_to_route}, name='{route.view_name}'),\n"
+            )
+        routes_list.sort()
+        for route in routes_list:
+            routes_code += route
+        code = f"""from django.urls import path
+from {self.name} import views
+
+urlpatterns = [
+{routes_code}
+] """
+        return code
 
     def save_models(self):
         file = open(self.APP_PATH + "models.py", 'a')
@@ -326,4 +389,9 @@ admin.site.register(User, UserAdmin) """
             return
         file = open(self.APP_PATH + "admin.py", 'w')
         file.write(code)
+        file.close()
+
+    def save_routings(self):
+        file = open(self.APP_PATH + "urls.py", 'w')
+        file.write(self.get_routes_code())
         file.close()
