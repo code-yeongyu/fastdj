@@ -8,3 +8,4 @@ class Template:
     filter_objects_view = "filter_objects_view"
     user_register_view = "user_register_view"
     user_profile_view = "user_profile_view"
+    user_profile_detail_view = "user_profile_detail_view"

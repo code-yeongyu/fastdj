@@ -171,9 +171,42 @@ def register(request):
         return Response(status=status.HTTP_201_CREATED)
     return Response(form.errors, status=status.HTTP_406_NOT_ACCEPTABLE)
             """
+        elif self.template == Template.user_profile_view:
+            self.modules.append("from rest_framework import permissions")
+            self.modules.append("from rest_framework.views import APIView")
+            self.code = f"""class ProfileAPIView(APIView):
+    def get(self, request):
+        profile = {self.model_name}.objects.get(user=user)
+        return Response({self.SERIALIZER}(profile).data,
+                        status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        profile = {self.model_name}.objects.get(user=user)
+        serializer = {self.SERIALIZER}(profile, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors,
+                        status=status.HTTP_406_NOT_ACCEPTABLE)
+            """
+        elif self.template == Template.user_profile_detail_view:
+            self.code = f"""class ProfileDetail(APIView):
+    def get(self, request, string):
+        try:
+            user = User.objects.get(username=string)
+        except:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        try:
+            profile = {self.model_name}.objects.get(user=user)
+        except:
+            {self.model_name}.objects.create(user=user)
+            profile = {self.model_name}.objects.get(user=user)
+        return Response(
+            {self.SERIALIZER}(profile).data,
+            status=status.HTTP_200_OK)
+            """
         else:
             self.code = ""
-
 
 
 class App:

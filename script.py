@@ -248,18 +248,26 @@ class Project:
 
             # register view specs to object
             if app.name == 'custom_user':
-                if self.user_model.get('set_visibility_public', True):
-                    app.add_view(
-                        ViewSet(app.name,
-                                "register",
-                                template=Template.user_register_view,
-                                model_name="Profile"))
                 app.add_view(
                     ViewSet(
                         app.name,
-                        "ProfileAPIView",
-                        model_name="Profile",
+                        "Profile",
+                        Template.user_profile_view,
                     ))
+                if self.user_model.get('allow_register', True):
+                    app.add_view(
+                        ViewSet(
+                            app.name,
+                            "Profile",
+                            Template.user_register_view,
+                        ))
+                if self.user_model.get('set_visibility_public', True):
+                    app.add_view(
+                        ViewSet(
+                            app.name,
+                            "Profile",
+                            Template.user_profile_detail_view,
+                        ))
 
             else:
                 for view_name in setup_file.apps[app.name]['views'].keys():
