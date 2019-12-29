@@ -20,10 +20,10 @@ user_model = {
         },
         "job": {
             "field":
-            "ChoiceField",
+            "CharField",
             "choices": [("ST", "STUDENT"), ("BS", "BUSINESS MAN"),
                         ("PR", "PROGRAMMER"), ("ETC", "ETC")],
-            "options": ["max_length=2", "default='ETC'"]
+            "options": ["max_length=3", "default='ETC'"]
         }
     }
 }
@@ -55,7 +55,7 @@ apps = {
                 "template": "all_objects_view",
                 "model": "Article",
                 "owner_field_name": "writer",
-                "permissions": "AllowAnyOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
+                "permissions": "IsAuthenticatedOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
             },
             "my_posts_view": { # get all posts with writer = request.user
                 "template": "filter_objects_view",
