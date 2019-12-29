@@ -101,7 +101,10 @@ class ViewSet:
         code += f"\tpermission_classes = (permissions.{self.permissions})\n"
         return code
 
-    def update_code(self):  # test required
+    def get_code(self):
+        return self.code
+
+    def update_code(self):
         self.code = ""
         self.modules.append("from rest_framework.response import Response")
         if self.template == Template.detail_view:
@@ -167,8 +170,6 @@ def register(request):
         else:
             self.code = ""
 
-    def get_code(self):
-        return self.code
 
 
 class App:
@@ -244,7 +245,6 @@ class UserAdmin(UserAdmin):
 
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin) """
-        print(self.name, code)
         return code
 
     def get_views_code(self):
@@ -256,7 +256,7 @@ admin.site.register(User, UserAdmin) """
             for module in set(view.modules):
                 modules.append(module)
             code += view.get_code() + "\n"
-        for module in set(modules):  # used set to remove duplicates
+        for module in set(modules):  # set used to remove duplicates
             modules_code += module + "\n"
         return modules_code + "\n" + code
 
@@ -268,11 +268,6 @@ admin.site.register(User, UserAdmin) """
     def save_serializers(self):
         file = open(self.APP_PATH + "serializers.py", 'w')
         file.write(self.get_serializers_code())
-        file.close()
-
-    def save_views(self):
-        file = open(self.APP_PATH + "views.py", 'w')
-        file.write(self.get_views_code())
         file.close()
 
     def save_views(self):
