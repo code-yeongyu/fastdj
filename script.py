@@ -253,7 +253,7 @@ class Project:
                                                       field_specs))
                     app.add_model(model)
 
-            # register view specs to object
+            # register, token view specs to object
             if app.name == 'custom_user':
                 app.add_view(
                     ViewSet(
@@ -266,6 +266,10 @@ class Project:
                           viewset_name_to_route="ProfileAPIView",
                           template=Template.user_profile_view,
                           arg_type=None))
+                token_route = Route("")
+                token_route.code = "    path('auth/', drf_views.obtain_auth_token),\n"
+                token_route.is_raw = True
+                app.add_route(token_route)
                 if self.user_model.get('set_visibility_public', True):
                     app.add_view(
                         ViewSet(
