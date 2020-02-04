@@ -2,6 +2,15 @@ import os, enum
 from template import Template
 
 
+def find_owner_field_in_list(list):
+    i = 0
+    for item in list:
+        if item.template == Template.model_owner:
+            return i
+        i += 1
+    return None
+
+
 class Field:
     def __init__(self, field_name, field_type=None, **kwargs):
         self.field_name = field_name
@@ -11,9 +20,9 @@ class Field:
         self.options = kwargs.get('options', [])
         self.choices = kwargs.get('choices')
         self.not_to_serialize = kwargs.get('not_to_serialize', False)
-        template = kwargs.get('template')
+        self.template = kwargs.get('template')
 
-        if template == Template.model_owner:
+        if self.template == Template.model_owner:
             self.field_type = "ForeignKey"
             self.options = [
                 "'auth.user'", f"related_name='{self.app_name}_{field_name}'",
@@ -74,9 +83,11 @@ class Model:
 
 
 class ViewSet:
-    def __init__(self, app_name, model_name, template, **kwargs):
+    def __init__(self, project_name, app_name, model, template, **kwargs):
         self.app_name = app_name
-        self.model_name = model_name
+        self.project_name = project_name
+        self.model = model
+        self.model_name = model.name
         self.template = template
         self.name = kwargs.get('name')
         self.options = kwargs.get('options', list())
@@ -89,7 +100,6 @@ class ViewSet:
         self.modules.append(
             f"from {self.app_name}.serializers import {self.SERIALIZER}")
         self.modules.append("from rest_framework import status")
-        self.owner_field_name = kwargs.get('owner_field_name')
         self.code = str()
 
     def _use_generic_based_template(self):

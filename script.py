@@ -14,6 +14,15 @@ from project import App
 from template import Template
 
 
+def find_name_in_list(list, name):
+    i = 0
+    for item in list:
+        if item.name == name:
+            return i
+        i += 1
+    return None
+
+
 class ProjectCommand:  # class about project initializing, like commands
     def __init__(self, prj_name):
         self.prj_name = prj_name
@@ -65,6 +74,7 @@ class ProjectConfigurations:
     def __init__(self, project_name):
         self.settings_file_path = f"{os.getcwd()}/{project_name}/{project_name}/settings.py"
         self.urls_file_path = f"{os.getcwd()}/{project_name}/{project_name}/urls.py"
+        self.permissions_file_path = f"{os.getcwd()}/{project_name}/{project_name}/permissions.py"
 
     def load_settings(self):
         settings_file = open(self.settings_file_path, 'r')
@@ -117,6 +127,17 @@ class ProjectConfigurations:
         last_path_index = self.urls.find(
             "]", urlpatterns_index) - 1  # except itself and the '\n
         self.urls = f"{self.urls[:last_path_index]}\n\t# added by fastdj\n\tpath('{app_name}/', include('{app_name}.urls'), name='{app_name}'),{self.urls[last_path_index:]}\n"
+
+    def save_permissions(self):
+        file = open(self.permissions_file_path, 'w')
+        file.write("""from rest_framework import permissions
+
+class IsOwnerOrReadOnly(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return obj.owner == request.user""")
+        file.close()
 
     def save_settings(self):
         file = open(self.settings_file_path, 'w')
@@ -257,8 +278,9 @@ class Project:
             if app.name == 'custom_user':
                 app.add_view(
                     ViewSet(
+                        self.project_name,
                         app.name,
-                        "Profile",
+                        app.models[find_name_in_list(app.models, "Profile")],
                         Template.user_profile_view,
                     ))
                 app.add_route(
@@ -273,8 +295,10 @@ class Project:
                 if self.user_model.get('set_visibility_public', True):
                     app.add_view(
                         ViewSet(
+                            self.project_name,
                             app.name,
-                            "Profile",
+                            app.models[find_name_in_list(
+                                app.models, "Profile")],
                             Template.user_profile_detail_view,
                         ))
                     app.add_route(
@@ -285,24 +309,29 @@ class Project:
                 if self.user_model.get('allow_register', True):
                     app.add_view(
                         ViewSet(
+                            self.project_name,
                             app.name,
-                            "Profile",
+                            app.models[find_name_in_list(
+                                app.models, "Profile")],
                             Template.user_register_view,
                         ))
                     app.add_route(Route("register", arg_type=None))
             else:
                 for view_name in setup_file.apps[app.name]['views'].keys():
                     view = setup_file.apps[app.name]['views'].get(view_name)
+                    target_model_index = find_name_in_list(
+                        app.models, view.get('model'))
                     app.add_view(
-                        ViewSet(app.name,
-                                view.get('model'),
-                                view.get('template'),
-                                name=view_name,
-                                options=view.get('options', list()),
-                                permissions=view.get('permissions', ""),
-                                url_getters=view.get('url_getters', ""),
-                                owner_field_name=view.get(
-                                    'owner_field_name', None)))
+                        ViewSet(
+                            self.project_name,
+                            app.name,
+                            app.models[target_model_index],
+                            view.get('template'),
+                            name=view_name,
+                            options=view.get('options', list()),
+                            permissions=view.get('permissions', ""),
+                            url_getters=view.get('url_getters', ""),
+                        ))
                     app.add_route(
                         Route(view_name, template=view.get('template')))
             app.save_models()
@@ -312,6 +341,7 @@ class Project:
             app.save_admin_file()
             app.save_routings()
         self.confs.save_settings()
+        self.confs.save_permissions()
         self.confs.save_urls()
         self.makemigrations_and_migrate()
         self.cmd.run_server()
