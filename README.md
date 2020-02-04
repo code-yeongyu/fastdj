@@ -1,4 +1,4 @@
-[한국어 README][https://github.com/code-yeongyu/fastdj/blob/master/readme_ko.md]
+[한국어 README](https://github.com/code-yeongyu/fastdj/blob/master/README_ko.md)
 
 # What is FastDJ
 
