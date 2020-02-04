@@ -1,3 +1,5 @@
+[한국어 README][https://github.com/code-yeongyu/fastdj/blob/master/readme_ko.md]
+
 # What is FastDJ
 
 FastDJ is a simple script that helps you to create your restful api django backend project easily.  
