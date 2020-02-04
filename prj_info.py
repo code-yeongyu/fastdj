@@ -16,7 +16,7 @@ user_model = {
         },
         "website": {
             "field": "URLField",
-            "options": []
+            "options": ["null=True"]
         },
         "job": {
             "field":
@@ -49,12 +49,11 @@ apps = {
             "PostDetail": { # make a route for reading, updating, deleting a post
                 "template": "detail_view_ud",
                 "model": "Article",
-                "permissions": "AllowAny" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
+                "permissions": "IsOwnerOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
             },
             "PostOverall": { # make a route for read all posts of its model in the DB, create a data of its model in the DB
                 "template": "all_objects_view",
                 "model": "Article",
-                "owner_field_name": "writer",
                 "permissions": "IsAuthenticatedOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
             },
             "my_posts_view": { # get all posts with writer = request.user
@@ -96,7 +95,6 @@ apps = {
             "create_comment_view": { # make a route for read all posts of its model in the DB, create a data of its model in the DB
                 "template": "all_objects_view",
                 "model": "Comment",
-                "owner_field_name": "writer",
                 "permissions": "IsAuthenticatedOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
             },
         }
