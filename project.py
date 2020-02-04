@@ -125,20 +125,17 @@ class ViewSet:
             self.code = f"class {self.name}(generics.RetrieveUpdateDestroyAPIView):\n"
             self.code += self._get_template_code()
         elif self.template == Template.all_objects_view:
+            owner_field_name = self.model.fields[find_owner_field_in_list(
+                self.model.fields)].field_name
             self._use_generic_based_template()
             self.modules.append("from rest_framework.views import APIView")
             self.modules.append("from django.http import JsonResponse")
-            self.code = f"""class {self.name}(generics.ListAPIView, APIView):
+            self.code = f"""class {self.name}(generics.ListCreateAPIView, APIView):
 {self._get_template_code()}
-    def post(self, request):
-        if request.user.is_authenticated:
-            serializer = {self.SERIALIZER}(data=request.data)
-            if serializer.is_valid():
-                serializer.save({self.owner_field_name}=request.user)
-                return JsonResponse(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        return Response(status=status.HTTP_401_UNAUTHORIZED)
+    def perform_create(self, serializer):
+        serializer.save({owner_field_name}=request.user)
         """
+
         elif self.template == Template.filter_objects_view:
             self.modules.append(
                 "from rest_framework.decorators import api_view")
@@ -202,11 +199,7 @@ def register(request):
             user = User.objects.get(username=string)
         except:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            profile = {self.model_name}.objects.get(user=user)
-        except:
-            {self.model_name}.objects.create(user=user)
-            profile = {self.model_name}.objects.get(user=user)
+        profile = {self.model_name}.objects.get_or_create(user=user)
         return Response(
             {self.SERIALIZER}(profile).data,
             status=status.HTTP_200_OK)
