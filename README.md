@@ -18,4 +18,4 @@ You need to use python3 or later and the django 2.0 or later to use this script.
 # So do I have to use it?
 
 You don't have to use it if you want high-customizable features.  
-But you can write a restful api backend of a community service with 90 lines of settings file. Check it on the examples directory of this project.
+But you can write a restful api backend of a community service with 105 lines of settings file. Check it on the examples directory of this project.
