@@ -2,6 +2,15 @@ import os, enum
 from template import Template
 
 
+def find_owner_field_in_list(list):
+    i = 0
+    for item in list:
+        if item.template == Template.model_owner:
+            return i
+        i += 1
+    return None
+
+
 class Field:
     def __init__(self, field_name, field_type=None, **kwargs):
         self.field_name = field_name
@@ -11,9 +20,9 @@ class Field:
         self.options = kwargs.get('options', [])
         self.choices = kwargs.get('choices')
         self.not_to_serialize = kwargs.get('not_to_serialize', False)
-        template = kwargs.get('template')
+        self.template = kwargs.get('template')
 
-        if template == Template.model_owner:
+        if self.template == Template.model_owner:
             self.field_type = "ForeignKey"
             self.options = [
                 "'auth.user'", f"related_name='{self.app_name}_{field_name}'",
@@ -21,7 +30,7 @@ class Field:
             ]
             self.serializers = {
                 "field": "ReadOnlyField",
-                "options": ["source='writer.username'"]
+                "options": [f"source='{self.field_name}.username'"]
             }
 
     def get_code(self):
@@ -74,9 +83,11 @@ class Model:
 
 
 class ViewSet:
-    def __init__(self, app_name, model_name, template, **kwargs):
+    def __init__(self, project_name, app_name, model, template, **kwargs):
         self.app_name = app_name
-        self.model_name = model_name
+        self.project_name = project_name
+        self.model = model
+        self.model_name = model.name
         self.template = template
         self.name = kwargs.get('name')
         self.options = kwargs.get('options', list())
@@ -88,7 +99,7 @@ class ViewSet:
             f"from {self.app_name}.models import {self.model_name}")
         self.modules.append(
             f"from {self.app_name}.serializers import {self.SERIALIZER}")
-        self.owner_field_name = kwargs.get('owner_field_name')
+        self.modules.append("from rest_framework import status")
         self.code = str()
 
     def _use_generic_based_template(self):
@@ -98,7 +109,13 @@ class ViewSet:
     def _get_template_code(self):
         code = f"    queryset = {self.model_name}.objects.all()\n"
         code += f"    serializer_class = {self.SERIALIZER}\n"
-        code += f"    permission_classes = (permissions.{self.permissions})\n"
+        if self.permissions == "IsOwnerOrReadOnly":
+            self.modules.append(
+                f"from {self.project_name}.permissions import IsOwnerOrReadOnly"
+            )
+            code += f"    permission_classes = (IsOwnerOrReadOnly,)\n"
+            return code
+        code += f"    permission_classes = (permissions.{self.permissions},)\n"
         return code
 
     def get_code(self):
@@ -124,22 +141,17 @@ class ViewSet:
             self.code = f"class {self.name}(generics.RetrieveUpdateDestroyAPIView):\n"
             self.code += self._get_template_code()
         elif self.template == Template.all_objects_view:
+            owner_field_name = self.model.fields[find_owner_field_in_list(
+                self.model.fields)].field_name
             self._use_generic_based_template()
             self.modules.append("from rest_framework.views import APIView")
             self.modules.append("from django.http import JsonResponse")
-            self.code = f"""class {self.name}(generics.ListAPIView, APIView):
+            self.code = f"""class {self.name}(generics.ListCreateAPIView, APIView):
 {self._get_template_code()}
-    def post(self, request):
-        if request.user.is_authenticated:
-            serializer = {self.SERIALIZER}(data=request.data)
-            if serializer.is_valid():
-                serializer = {self.SERIALIZER}(data=request.data)
-                if serializer.is_valid():
-                    serializer.save({self.owner_field_name}=request.user)
-                    return JsonResponse(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        return Response(status=status.HTTP_401_UNAUTHORIZED)
+    def perform_create(self, serializer):
+        serializer.save({owner_field_name}=request.user)
         """
+
         elif self.template == Template.filter_objects_view:
             self.modules.append(
                 "from rest_framework.decorators import api_view")
@@ -152,7 +164,7 @@ class ViewSet:
                 options_str += option + ", "
             options_str = options_str[:-2]  # to remove last ", "
             self.code += f"    object_to_return = get_object_or_404({self.model_name}, {options_str}).values()\n"
-            self.code += f"    return Response(object_to_return)"
+            self.code += f"    return Response({self.SERIALIZER}(object_to_return).data)"
         elif self.template == Template.user_register_view:
             self.modules.append(
                 "from rest_framework.decorators import api_view")
@@ -164,11 +176,14 @@ def register(request):
     if form.is_valid():
         user = form.save(commit=False)
         user.save()
-        profile = {self.model_name}.objects.get(user=user)
+        profile = {self.model_name}.objects.create(user=user)
         serializer = {self.SERIALIZER}(profile, data=request.data)
         if serializer.is_valid():
             serializer.save()
-        return Response(status=status.HTTP_201_CREATED)
+            return Response(status=status.HTTP_201_CREATED)
+        {self.model_name}.objects.get(user=user).delete()
+        return Response(serializer.errors,
+                        status=status.HTTP_406_NOT_ACCEPTABLE)
     return Response(form.errors, status=status.HTTP_406_NOT_ACCEPTABLE)
             """
         elif self.template == Template.user_profile_view:
@@ -176,18 +191,22 @@ def register(request):
             self.modules.append("from rest_framework.views import APIView")
             self.code = f"""class ProfileAPIView(APIView):
     def get(self, request):
-        profile = {self.model_name}.objects.get(user=user)
-        return Response({self.SERIALIZER}(profile).data,
-                        status=status.HTTP_200_OK)
+        if request.user.is_authenticated:
+            profile = {self.model_name}.objects.get(user=user)
+            return Response({self.SERIALIZER}(profile).data,
+                            status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_401_UNAUTHORIZED)
 
     def patch(self, request):
-        profile = {self.model_name}.objects.get(user=user)
-        serializer = {self.SERIALIZER}(profile, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors,
-                        status=status.HTTP_406_NOT_ACCEPTABLE)
+        if request.user.is_authenticated:
+            profile = {self.model_name}.objects.get(user=user)
+            serializer = {self.SERIALIZER}(profile, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors,
+                            status=status.HTTP_406_NOT_ACCEPTABLE)
+        return Response(status=status.HTTP_401_UNAUTHORIZED)
             """
         elif self.template == Template.user_profile_detail_view:
             self.code = f"""class ProfileDetail(APIView):
@@ -196,11 +215,7 @@ def register(request):
             user = User.objects.get(username=string)
         except:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            profile = {self.model_name}.objects.get(user=user)
-        except:
-            {self.model_name}.objects.create(user=user)
-            profile = {self.model_name}.objects.get(user=user)
+        profile = {self.model_name}.objects.get_or_create(user=user)
         return Response(
             {self.SERIALIZER}(profile).data,
             status=status.HTTP_200_OK)
@@ -211,6 +226,7 @@ def register(request):
 
 class Route:
     code = ""
+    is_raw = False
 
     def __init__(self, view_name, **kwargs):
         self.view_name = view_name
@@ -232,9 +248,12 @@ class Route:
         else:
             self.code = f"{view_name.lower()}/"
         if arg_type == int:
-            self.code += "<int:id>/"
+            self.code += "<int:pk>/"
         elif arg_type == str:
             self.code += "<string>/"
+
+    def get_code(self):
+        return self.code
 
     @staticmethod
     def template_to_arg_type(template):
@@ -244,9 +263,6 @@ class Route:
             return str
         else:
             return None
-
-    def get_code(self):
-        return self.code
 
 
 class App:
@@ -344,16 +360,21 @@ admin.site.register(User, UserAdmin) """
 
     def get_routes_code(self):
         routes_list = list()
-        routes_code = ""
-        for route in self.routes:
-            routes_list.append(
-                f"    path('{route.get_code()}', views.{route.viewset_name_to_route}, name='{route.view_name}'),\n"
-            )
-        routes_list.sort()
-        for route in routes_list:
-            routes_code += route
         code = f"""from django.urls import path
 from {self.name} import views
+"""
+        routes_code = ""
+        for route in self.routes:
+            if not route.is_raw:
+                routes_list.append(
+                    f"    path('{route.get_code()}', views.{route.viewset_name_to_route}, name='{route.view_name}'),\n"
+                )
+            else:  # for token login view
+                routes_list.append(route.get_code())
+                code += "from rest_framework.authtoken import views as drf_views"
+        routes_list.sort(reverse=True)
+        routes_code = ''.join(routes_list)
+        code += f"""
 
 urlpatterns = [
 {routes_code}

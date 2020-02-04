@@ -16,7 +16,7 @@ user_model = {
         },
         "website": {
             "field": "URLField",
-            "options": []
+            "options": ["null=True"]
         },
         "job": {
             "field":
@@ -49,18 +49,23 @@ apps = {
             "PostDetail": { # make a route for reading, updating, deleting a post
                 "template": "detail_view_ud",
                 "model": "Article",
-                "permissions": "AllowAny" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
+                "permissions": "IsOwnerOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
             },
-            "PostOverall": { # make a route for read all posts of its model in the DB, create a data of its model in the DB
+            "PostList": { # make a route for read all posts of its model in the DB, create a data of its model in the DB
                 "template": "all_objects_view",
                 "model": "Article",
-                "owner_field_name": "writer",
                 "permissions": "IsAuthenticatedOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
             },
             "my_posts_view": { # get all posts with writer = request.user
                 "template": "filter_objects_view",
                 "model": "Article",
                 "options": ["writer=request.user"]
+            },
+            "user_posts_view": {
+                "template": "filter_objects_view",
+                "model": "Article",
+                "url_getters": "username",
+                "options": ["writer=username"]
             }
         }
     },
@@ -86,7 +91,12 @@ apps = {
                 "model": "Comment",
                 "url_getters": "article_pk",
                 "options": ["article_id=article_pk"]
-            }
+            },
+            "create_comment_view": { # make a route for read all posts of its model in the DB, create a data of its model in the DB
+                "template": "all_objects_view",
+                "model": "Comment",
+                "permissions": "IsAuthenticatedOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
+            },
         }
     }
 }

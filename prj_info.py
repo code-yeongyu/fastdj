@@ -51,7 +51,7 @@ apps = {
                 "model": "Article",
                 "permissions": "IsOwnerOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
             },
-            "PostOverall": { # make a route for read all posts of its model in the DB, create a data of its model in the DB
+            "PostList": { # make a route for read all posts of its model in the DB, create a data of its model in the DB
                 "template": "all_objects_view",
                 "model": "Article",
                 "permissions": "IsAuthenticatedOrReadOnly" # check available permission options at https://www.django-rest-framework.org/api-guide/permissions/#api-reference
