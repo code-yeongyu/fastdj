@@ -109,7 +109,13 @@ class ViewSet:
     def _get_template_code(self):
         code = f"    queryset = {self.model_name}.objects.all()\n"
         code += f"    serializer_class = {self.SERIALIZER}\n"
-        code += f"    permission_classes = (permissions.{self.permissions})\n"
+        if self.permissions == "IsOwnerOrReadOnly":
+            self.modules.append(
+                f"from {self.project_name}.permissions import IsOwnerOrReadOnly"
+            )
+            code += f"    permission_classes = (IsOwnerOrReadOnly,)\n"
+            return code
+        code += f"    permission_classes = (permissions.{self.permissions},)\n"
         return code
 
     def get_code(self):
