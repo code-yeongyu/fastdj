@@ -21,7 +21,7 @@ class Field:
             ]
             self.serializers = {
                 "field": "ReadOnlyField",
-                "options": ["source='writer.username'"]
+                "options": [f"source='{self.field_name}.username'"]
             }
 
     def get_code(self):
@@ -168,6 +168,9 @@ def register(request):
         if serializer.is_valid():
             serializer.save()
             return Response(status=status.HTTP_201_CREATED)
+        {self.model_name}.objects.get(user=user).delete()
+        return Response(serializer.errors,
+                        status=status.HTTP_406_NOT_ACCEPTABLE)
     return Response(form.errors, status=status.HTTP_406_NOT_ACCEPTABLE)
             """
         elif self.template == Template.user_profile_view:
@@ -236,7 +239,7 @@ class Route:
         else:
             self.code = f"{view_name.lower()}/"
         if arg_type == int:
-            self.code += "<int:id>/"
+            self.code += "<int:pk>/"
         elif arg_type == str:
             self.code += "<string>/"
 
@@ -360,7 +363,7 @@ from {self.name} import views
             else:  # for token login view
                 routes_list.append(route.get_code())
                 code += "from rest_framework.authtoken import views as drf_views"
-        routes_list.sort()
+        routes_list.sort(reverse=True)
         routes_code = ''.join(routes_list)
         code += f"""
 
