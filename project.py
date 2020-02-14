@@ -141,16 +141,24 @@ class ViewSet:
             self.code = f"class {self.name}(generics.RetrieveUpdateDestroyAPIView):\n"
             self.code += self._get_template_code()
         elif self.template == Template.all_objects_view:
-            owner_field_name = self.model.fields[find_owner_field_in_list(
-                self.model.fields)].field_name
+            import pdb
+            pdb.set_trace()
+            owner_field_index = find_owner_field_in_list(self.model.fields)
             self._use_generic_based_template()
             self.modules.append("from rest_framework.views import APIView")
             self.modules.append("from django.http import JsonResponse")
-            self.code = f"""class {self.name}(generics.ListCreateAPIView, APIView):
+            if owner_field_index != None:
+                owner_field_name = self.model.fields[
+                    owner_field_index].field_name
+                self.code = f"""class {self.name}(generics.ListCreateAPIView, APIView):
 {self._get_template_code()}
     def perform_create(self, serializer):
-        serializer.save({owner_field_name}=request.user)
-        """
+        serializer.save({owner_field_name}=request.user)"""
+            else:
+                self.code = f"""class {self.name}(generics.ListCreateAPIView, APIView):
+{self._get_template_code()}
+    def perform_create(self, serializer):
+        serializer.save()"""
 
         elif self.template == Template.filter_objects_view:
             self.modules.append(
