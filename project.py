@@ -79,6 +79,8 @@ class Model:
         code = f"class {self.name}(models.Model):\n"
         for field in self.fields:
             code += field.get_code()
+        if self.name == "custom_user":
+            
         return code
 
 
@@ -171,8 +173,8 @@ class ViewSet:
             for option in self.options:
                 options_str += option + ", "
             options_str = options_str[:-2]  # to remove last ", "
-            self.code += f"    object_to_return = get_object_or_404({self.model_name}, {options_str}).values()\n"
-            self.code += f"    return Response({self.SERIALIZER}(object_to_return).data)"
+            self.code += f"    objects = {self.model_name}.objects.filter({options_str})\n"
+            self.code += f"    return Response({self.SERIALIZER}(objects, many=True).data)"
         elif self.template == Template.user_register_view:
             self.modules.append(
                 "from rest_framework.decorators import api_view")
@@ -296,9 +298,22 @@ class App:
     def get_models_code(self):
         code = ""
         if self.name == "custom_user":
-            code += "from django.conf import settings\n"
+            code += """from django.conf import settings
+from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver"""
         for model in self.models:
             code += model.get_model_code() + "\n"
+        if self.name == "custom_user":
+            code += """\n\n@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        Profile.objects.create(user=instance)
+
+
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, **kwargs):
+    instance.profile.save()"""
         return code
 
     def get_serializers_code(self):
