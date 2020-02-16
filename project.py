@@ -71,7 +71,7 @@ class Model:
             if field.not_to_serialize:
                 continue
             fields_str += f"'{field.field_name}', "
-        fields_str = fields_str[:-2]  # to remove last ", "
+        fields_str = fields_str
         code += f"        fields = ({fields_str})"
         return code
 
@@ -79,9 +79,35 @@ class Model:
         code = f"class {self.name}(models.Model):\n"
         for field in self.fields:
             code += field.get_code()
-        if self.name == "custom_user":
-            
         return code
+
+    def get_admin_code(self, app_name):
+        # admin feature currently supported limitedly for custom profile features
+        code = ""
+        modules = []
+        if app_name == "custom_user":
+            modules.append("from django.contrib import admin")
+            modules.append("from django.contrib.auth.admin import UserAdmin")
+            modules.append("from django.contrib.auth.models import User")
+            modules.append("from custom_user.models import Profile")
+            code = """class ProfileInline(admin.StackedInline):
+    model = Profile
+    can_delete = False
+    verbose_name_plural = 'profile'
+
+
+class UserAdmin(UserAdmin):
+    inlines = (ProfileInline, )
+
+
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)
+"""
+        else:
+            modules.append("from django.contrib import admin")
+            modules.append(f"from {app_name}.models import {self.name}")
+            code = f"admin.site.register({self.name})\n"
+        return modules, code
 
 
 class ViewSet:
@@ -143,24 +169,16 @@ class ViewSet:
             self.code = f"class {self.name}(generics.RetrieveUpdateDestroyAPIView):\n"
             self.code += self._get_template_code()
         elif self.template == Template.all_objects_view:
-            import pdb
-            pdb.set_trace()
-            owner_field_index = find_owner_field_in_list(self.model.fields)
+            owner_field_name = self.model.fields[find_owner_field_in_list(
+                self.model.fields)].field_name
             self._use_generic_based_template()
             self.modules.append("from rest_framework.views import APIView")
             self.modules.append("from django.http import JsonResponse")
-            if owner_field_index != None:
-                owner_field_name = self.model.fields[
-                    owner_field_index].field_name
-                self.code = f"""class {self.name}(generics.ListCreateAPIView, APIView):
+            self.code = f"""class {self.name}(generics.ListCreateAPIView, APIView):
 {self._get_template_code()}
     def perform_create(self, serializer):
-        serializer.save({owner_field_name}=request.user)"""
-            else:
-                self.code = f"""class {self.name}(generics.ListCreateAPIView, APIView):
-{self._get_template_code()}
-    def perform_create(self, serializer):
-        serializer.save()"""
+        serializer.save({owner_field_name}=request.user)
+        """
 
         elif self.template == Template.filter_objects_view:
             self.modules.append(
@@ -173,8 +191,8 @@ class ViewSet:
             for option in self.options:
                 options_str += option + ", "
             options_str = options_str[:-2]  # to remove last ", "
-            self.code += f"    objects = {self.model_name}.objects.filter({options_str})\n"
-            self.code += f"    return Response({self.SERIALIZER}(objects, many=True).data)"
+            self.code += f"    object_to_return = get_object_or_404({self.model_name}, {options_str}).values()\n"
+            self.code += f"    return Response({self.SERIALIZER}(object_to_return).data)"
         elif self.template == Template.user_register_view:
             self.modules.append(
                 "from rest_framework.decorators import api_view")
@@ -301,19 +319,16 @@ class App:
             code += """from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
-from django.dispatch import receiver"""
+from django.dispatch import receiver
+"""
         for model in self.models:
             code += model.get_model_code() + "\n"
         if self.name == "custom_user":
-            code += """\n\n@receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        Profile.objects.create(user=instance)
-
-
+            code += """\n\n
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
-    instance.profile.save()"""
+    instance.profile.save()
+"""
         return code
 
     def get_serializers_code(self):
@@ -342,30 +357,6 @@ class RegisterForm(UserCreationForm):
     class Meta:
         model = User
         fields = ('username', 'email', 'password1', 'password2')"""
-        return code
-
-    def get_admin_code(self):
-        # admin feature currently supported limitedly for custom profile features
-        code = ""
-        if self.name == "custom_user":
-            code = """from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
-from django.contrib.auth.models import User
-from custom_user.models import Profile
-
-
-class ProfileInline(admin.StackedInline):
-    model = Profile
-    can_delete = False
-    verbose_name_plural = 'profile'
-
-
-class UserAdmin(UserAdmin):
-    inlines = (ProfileInline, )
-
-
-admin.site.unregister(User)
-admin.site.register(User, UserAdmin) """
         return code
 
     def get_views_code(self):
@@ -404,6 +395,21 @@ urlpatterns = [
 ] """
         return code
 
+    def get_admins_code(self):
+        # admin feature currently supported limitedly for custom profile features
+        code = ""
+        modules = []
+        code = ""
+        for model in self.models:
+            module, got_code = model.get_admin_code(self.name)
+            modules += module
+            code += got_code
+        modules = list(set(modules))
+        modules_str = ""
+        for module in modules:
+            modules_str += module + "\n"
+        return modules_str + "\n\n" + code
+
     def save_models(self):
         file = open(self.APP_PATH + "models.py", 'a')
         file.write(self.get_models_code())
@@ -428,7 +434,7 @@ urlpatterns = [
         file.close()
 
     def save_admin_file(self):
-        code = self.get_admin_code()
+        code = self.get_admins_code()
         if code == "":
             return
         file = open(self.APP_PATH + "admin.py", 'w')
